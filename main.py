@@ -32,9 +32,9 @@ class zippyBot(commands.Bot):
         await self.change_presence(
             activity=discord.CustomActivity(
                 name="Custom Status",
-                state="Watching Ivirius Text Editor Plus",
+                state="Watching Ivirius Text Editor Plus"
             ),
-            status=discord.Status.do_not_disturb,
+            status=discord.Status.online
         )
         if not self.synced:
             await self.tree.sync()
@@ -101,7 +101,7 @@ async def on_member_remove(member):
     roles = [role.mention for role in member.roles]
     embed.add_field(name="Roles", value=", ".join(roles), inline=False)
 
-    channel = bot.get_channel(1188420266234228809)
+    channel = bot.get_channel(1386050116238049280)
     await channel.send(embed=embed)
 
 

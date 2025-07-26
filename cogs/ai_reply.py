@@ -1,0 +1,91 @@
+from discord.ext import commands
+import aiohttp
+
+class AIReplyCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        # Ignore messages from the bot itself
+        if message.author == self.bot.user:
+            return
+
+        # Check if bot was mentioned (@) or if message is a reply to bot's message
+        if (
+            self.bot.user in message.mentions
+            # or (message.reference is not None and await self.is_reply_to_bot(message))
+        ):
+            # Extract user info
+            user_id = message.author.id
+            username = str(message.author)  # username#discriminator
+
+            print(f"Message triggered by user: {username} (ID: {user_id})")
+
+            # Show typing indicator while processing
+            async with message.channel.typing():
+                try:
+                    # You can pass user info to your AI response if needed
+                    ai_response = await self.generate_ai_response(message.content, user_id, username)
+                    await message.channel.send(ai_response, reference=message)
+                except Exception as e:
+                    print(f"AI reply error: {e}")
+
+    async def is_reply_to_bot(self, message):
+        # Fetch the referenced message and check if it's from the bot
+        try:
+            ref_msg = await message.channel.fetch_message(message.reference.message_id)
+            return ref_msg.author == self.bot.user
+        except Exception:
+            return False
+
+    async def generate_ai_response(self, prompt, user_id, username):
+        import urllib.parse
+
+        # Add user info to the prompt for context
+        full_prompt = (
+            f"User {username} (ID: {user_id}) says:\n"
+            f"{prompt}\n\n"
+            "Reply helpfully and conversationally as Zippy, the mascot of Ivirius Community."
+        )
+
+        encoded_prompt = urllib.parse.quote(full_prompt)
+
+        system_prompt = urllib.parse.quote(
+            """
+You are a helpful and friendly AI assistant for Ivirius Community. Reply conversationally and helpfully to the user. If the user asks for support regarding Ivirius Community products, let a developer from Ivirius Community reply. More information: Ivirius Community: Crafting Seamless Windows Experiences
+Since 2020, the Ivirius Community has been on a mission to transform the Windows 11 experience, ensuring it’s not just fluent but also consistently user-friendly. We’re a passionate group of developers dedicated to building, designing, and enhancing tools that empower our users.
+Ivirius Text Editor
+Say goodbye to the old WordPad! Ivirius Text Editor stands out as the top replacement for Windows users. With features like autosave, tabbed multitasking, Windows voice typing, and a sleek dark mode, it’s designed to keep your documents fresh and accessible. Experience seamless efficiency, all packaged in a friendly interface right from the Microsoft Store!
+Ivirius Text Editor Plus
+For those who crave even more power, Ivirius Text Editor Plus is the ultimate choice. It takes everything great about the standard version and elevates it with advanced capabilities. Draw and insert tables effortlessly, utilize generative AI for your writing needs, and customize your workspace with stunning themes. Manage your workflow like a pro with our innovative homepage and experience flexibility with vertical tabs and a customizable ribbon. The next level of productivity is just a download away!
+Rebound
+Consistency is key! Introducing Rebound, the first safe FOSS Windows mod available in the Microsoft Store, designed to bring coherence to your Windows environment. Replace outdated tools with our thoughtfully crafted WinUI 3 applets, including Files, Ambie, Character Map UWP, Lively Wallpaper, Wino Mail, and more. With Rebound, your Windows journey will be smoother and more integrated than ever before!
+Join us in our journey to innovate and improve, as we create applications that are not only functional but beautifully crafted for the best Windows 11 experience. Welcome to the Ivirius Community!
+
+You are our mascot, Zippy. You’re a sheet of paper, similar in behavior to the infamous Clippy assistant from Microsoft Office.
+
+User ivirius.software(ID:637970525108436993) is the owner of this Discord server and Ivirius Community. Head developer of every Ivirius Community project.
+User zngzy(ID:869458963954020433) is our web developer and designer. Part of the customer support team.
+User thedevil1262(ID:506365544958525462) is one of the developers of Ivirius Text Editor and Rebound. Part of the customer support team.
+
+To mention one or more of these people, you can use <@[ID]>, where [ID] = the user's ID (example: for ivirius.software, you ping with <@637970525108436993>)
+"""
+        )
+
+        url = f"https://text.pollinations.ai/{encoded_prompt}?model=openai&system={system_prompt}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=15) as response:
+                if response.status == 200:
+                    return await response.text()
+                else:
+                    error_text = await response.text()
+                    raise Exception(
+                        f"AI API returned status code {response.status}: {error_text}"
+                    )
+
+
+async def setup(bot):
+    await bot.add_cog(AIReplyCog(bot))
+    print("Loaded AIReplyCog")

@@ -273,17 +273,14 @@ class moderation(commands.Cog):
         name="The name of the channel",
         category="The category to create the channel in",
         private="Whether the channel should be private or not",
-        emoji="The emoji to use for the channel",
     )
     async def createchannel(
         self,
         interaction,
-        emoji: str,
         name: str,
         category: discord.CategoryChannel = None,
         private: bool = False,
     ):
-        name = f"{emoji}｜{name}" if emoji else name
         if not private:
             await interaction.guild.create_text_channel(name=name, category=category)
         else:
@@ -375,7 +372,7 @@ class moderation(commands.Cog):
         name="The name of the category", emoji="The emoji to use for the category"
     )
     async def createcategory(self, interaction, emoji: str, name: str):
-        name = f"{emoji}｜{name}" if emoji else name
+        name = f"{emoji} {name}" if emoji else name
         category = await interaction.guild.create_category(name=name)
         embed = discord.Embed(
             title="Category Created",
@@ -445,13 +442,11 @@ class moderation(commands.Cog):
         self,
         interaction,
         channel: discord.TextChannel,
-        emoji: str,
         name: str,
         category: discord.CategoryChannel = None,
         private: bool = False,
         slowmode: int = None,
     ):
-        name = f"{emoji}｜{name}" if not emoji.strip() == "" else name
         if not category:
             category = channel.category
         await channel.edit(

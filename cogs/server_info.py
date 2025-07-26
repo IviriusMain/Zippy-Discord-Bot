@@ -7,6 +7,18 @@ class server_info(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.command(name="release", description="Announce a new release of an app.")
+    @app_commands.describe(app="Name of the app", version="Version number", link="Download link", ping="Role to ping for this release")
+    async def release(
+        self, interaction: discord.Interaction, app: str, version: str, link: str, ping: discord.Role
+    ):
+        embed = discord.Embed(
+            title=f"{app} - New Release",
+            description=f"**Version {version}**\n[Download here]({link})",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(content=f"<@&{ping.id}>", embed=embed)
+
     @app_commands.command(
         name="member-count", description="Get the number of members in the server"
     )
@@ -43,33 +55,28 @@ class server_info(commands.Cog):
     async def links(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="Ivirius Links",
-            description="Here are some links to Ivirius products",
-            color=discord.Color.green(),
+            description="Here are some links to Ivirius Community products",
+            color=discord.Color(int("4287f5", 16)),
         )
 
         embed.add_field(
-            name="Website <:Ivirius:1290061289258745896>",
+            name="Website <:Ivirius:1208396508941127701>",
             value="https://ivirius.com/",
             inline=False,
         )
         embed.add_field(
-            name="Rebound 11 <:Rebound11:1290061222494081075>",
-            value="https://ivirius.com/rebound11",
+            name="Rebound <:Rebound:1340813542902993008>",
+            value="https://ivirius.com/rebound/",
             inline=False,
         )
         embed.add_field(
-            name="Ivirius Text Editor Plus <:TextEditorPlus:1290061177140936704>",
-            value="https://ivirius.com/ivirius-text-editor-plus",
-            inline=False,
-        )
-        embed.add_field(
-            name="Ivirius Text Editor <:TextEditor:1290061049352949791>",
+            name="Ivirius Text Editor <:TextEditor:1320122327144468480>",
             value="https://ivirius.com/ivirius-text-editor/",
             inline=False,
         )
         embed.add_field(
-            name="Crimson UI <:CrimsonUI:1290061257361064062>",
-            value="https://ivirius.com/crimsonui",
+            name="Ivirius Text Editor Plus <:TextEditorPlus:1320122197750055003>",
+            value="https://ivirius.com/ivirius-text-editor-plus/",
             inline=False,
         )
 
