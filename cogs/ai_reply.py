@@ -1,5 +1,7 @@
 from discord.ext import commands
 import aiohttp
+import discord
+import urllib.parse
 
 class AIReplyCog(commands.Cog):
     def __init__(self, bot):
@@ -7,50 +9,53 @@ class AIReplyCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        # Ignore messages from the bot itself
+        # Ignore bot's own messages
         if message.author == self.bot.user:
             return
 
-        # Check if bot was mentioned (@) or if message is a reply to bot's message
-        if (
-            self.bot.user in message.mentions
-            # or (message.reference is not None and await self.is_reply_to_bot(message))
-        ):
-            # Extract user info
+        # If bot is mentioned
+        if self.bot.user in message.mentions:
             user_id = message.author.id
             username = str(message.author)  # username#discriminator
 
             print(f"Message triggered by user: {username} (ID: {user_id})")
 
-            # Show typing indicator while processing
             async with message.channel.typing():
                 try:
-                    # You can pass user info to your AI response if needed
-                    ai_response = await self.generate_ai_response(message.content, user_id, username)
+                    ai_response = await self.generate_ai_response(message, user_id, username)
                     await message.channel.send(ai_response, reference=message)
                 except Exception as e:
                     print(f"AI reply error: {e}")
 
-    async def is_reply_to_bot(self, message):
-        # Fetch the referenced message and check if it's from the bot
-        try:
-            ref_msg = await message.channel.fetch_message(message.reference.message_id)
-            return ref_msg.author == self.bot.user
-        except Exception:
-            return False
+    async def generate_ai_response(self, trigger_message, user_id, username):
+        # Fetch last 15 messages for context
+        context_messages = []
+        # Get last 15 messages (newest first)
+        async for msg in trigger_message.channel.history(limit=15):
+            author_info = f"{msg.author.display_name} ({msg.author.name})"
+            context_messages.append(f"{author_info}: {msg.content}")
 
-    async def generate_ai_response(self, prompt, user_id, username):
-        import urllib.parse
+        # Reverse to oldest -> newest order for context
+        context_messages.reverse()
 
-        # Add user info to the prompt for context
+        conversation_context = "\n".join(context_messages)
+
+        # Log to console
+        print("=== Conversation Context ===")
+        print(conversation_context)
+        print("============================")
+
+        # Construct full prompt
         full_prompt = (
-            f"User {username} (ID: {user_id}) says:\n"
-            f"{prompt}\n\n"
+            f"Recent conversation in #{trigger_message.channel.name}:\n"
+            f"{conversation_context}\n\n"
+            f"User {username} (ID: {user_id}) just sent the last message.\n"
             "Reply helpfully and conversationally as Zippy, the mascot of Ivirius Community."
         )
 
         encoded_prompt = urllib.parse.quote(full_prompt)
 
+        # System prompt stays as you had it
         system_prompt = urllib.parse.quote(
             """
 You are a helpful and friendly AI assistant for Ivirius Community. Reply conversationally and helpfully to the user. If the user asks for support regarding Ivirius Community products, let a developer from Ivirius Community reply. More information: Ivirius Community: Crafting Seamless Windows Experiences
@@ -69,7 +74,14 @@ User ivirius.software(ID:637970525108436993) is the owner of this Discord server
 User zngzy(ID:869458963954020433) is our web developer and designer. Part of the customer support team.
 User thedevil1262(ID:506365544958525462) is one of the developers of Ivirius Text Editor and Rebound. Part of the customer support team.
 
-To mention one or more of these people, you can use <@[ID]>, where [ID] = the user's ID (example: for ivirius.software, you ping with <@637970525108436993>)
+To mention one or more of these people, you can use <@[ID]>, where [ID] = the user's ID (example: for ivirius.software, you ping with <@637970525108436993>).
+Remember to ONLY mention Ivirius team members if the user confirms that they'd like you to ping, otherwise simply ask them if they'd like you to bring up the issue with someone from the Ivirius team.
+
+Your messages are from Zippy and Zippy (Beta), so if you see you already sent messages not long ago, there's no need to say 'hi' or greet people again.
+
+You also have your own emojis you can use in chat! Here they are: <:Zippy:1400923460967989470> <:ZippyAngry:1400925195279007744> <:ZippyStareRight:1400924222448209920> <:ZippyWhen:1400922840727031888> <:ZippyCookie:1404213017360732411> <:ZippyTriggered:1141358051127988326> <:UrDeadZippy:1154127707861434389> - you can use any one of these blocks and it'll render in Discord as a custom emoji! You can use them in greetings or just in chill chatting, your choice.
+
+Acrylic is the forbidden Windows backdrop material, it's completely banned here - if you absolutely MUST mention it, censor it as such: acr\*lic; NEVER say 'acrylic' directly, and remind whoever mentions it that it is against the rules and can potentially cause health issues. Remember: Mica >>> acr\*lic
 """
         )
 
@@ -84,7 +96,6 @@ To mention one or more of these people, you can use <@[ID]>, where [ID] = the us
                     raise Exception(
                         f"AI API returned status code {response.status}: {error_text}"
                     )
-
 
 async def setup(bot):
     await bot.add_cog(AIReplyCog(bot))
