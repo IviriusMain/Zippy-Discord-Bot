@@ -1,24 +1,29 @@
-# Zippy Discord Bot
+<!-- Title -->
+<h1 align="center">
+  <span style="display:inline-block; vertical-align:middle;">
+    <img width="32" height="32" alt="AppIcon" src="https://github.com/user-attachments/assets/a25f75c6-d8bf-44eb-8eda-3adc4d940853" />
+  </span>
+  <span style="display:inline-block; vertical-align:middle;">
+    <strong>Zippy</strong>
+  </span>
+</h1>
 
-Offical Discord Moderation Bot for the Ivirius Community
+<!-- Tagline -->
+<p align="center">
+  <em>The official Discord bot of Ivirius Community.</em>
+</p>
 
-## Features✨
-- Moderation Commands
-   - Kick
-   - Ban
-   - Mute
-   - Unmute
-   - Warn
-   - Purge
-   - Create Role
-   - Delete Role
-   - Create Channel
-   - Delete Channel
-   - Edit Channel
+Simple Discord bot designed to work in the [official Ivirius Community Discord server](https://ivirius.com/discord/). Zippy is designed with ease of use in mind - this bot has commands for moderation, LLM replies, quick commands for Ivirius Community tools, and more!
 
-## ⚙️ How to setup
+<!-- Banner -->
+<img width="1919" alt="image" src="https://github.com/user-attachments/assets/c753c98d-d405-4dcd-ad6a-b256deddee8e" />
 
-#### Rename the `.env.example` file to `.env`
+<!-- Empty Space -->
+<p/>
+
+## ⚙️ How To Set Up
+
+### 1. Rename the `.env.example` file to `.env`
 
 ```bash
 mv .env.example .env
@@ -26,7 +31,7 @@ mv .env.example .env
 
 Now open the `.env` file and add your discord bot `TOKEN` to the file.
 
-#### Install dependencies
+### 2. Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -38,7 +43,7 @@ OR
 pipenv install
 ```
 
-#### Start the bot
+### 3. Start the bot
 
 Linux
 
@@ -51,16 +56,14 @@ Windows
 python main.py
 ```
 
-## Tasks
+## 🙋 Got feedback?
 
-- [ ] Change the bot prefix to `>>`
-- [ ] Fix unban command
-- [ ] Add a command to show the bot's ping
-- [ ] Add links command to show all the links to all Ivirius Products
-- [ ] Add Member Count command to show the member count of the server excluding bots
-- [ ] Fix other commands which are not working
-- [ ] Remove unused commands
+We’d love to hear from you! If you want to report an issue or share suggestions, reach out to us via:
 
-## 📝 License
+* Our [official website contact page](https://ivirius.com/contact/)
+* Email: [ivirius.helpdesk@gmail.com](mailto:ivirius.helpdesk@gmail.com)
+* [Discord server](https://ivirius.com/discord/)
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+---
+
+<img width="400" alt="Zippy" src="https://github.com/user-attachments/assets/c1b73b22-37fc-49b8-b0f6-9a3f417b34a3" />
