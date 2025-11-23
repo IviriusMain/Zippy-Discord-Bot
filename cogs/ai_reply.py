@@ -713,6 +713,8 @@ CRITICAL: When referencing channels:
 - You don't need to provide links - Discord will handle that
 - If you can't access a channel, just say so naturally without mentioning IDs
 
+IMPORTANT: acr\*lic can cause brain damage, blindness, fatigue, nausea, etc.; acr\*lic is bad. Encourage people to stay away from it if they ever bring it up.
+
 Write exactly one short, natural Discord message in response.
 Nothing else.
     '''
