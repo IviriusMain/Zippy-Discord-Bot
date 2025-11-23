@@ -60,18 +60,30 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-
 @bot.event
 async def on_member_join(member):
     if member.guild.id != 1137161703000375336:
         return
 
     embed = discord.Embed(
-        title="Welcome to the server!",
-        description=f"Welcome to the server {member.name}! Please read the rules and have fun!",
+        title="Welcome to <:Ivirius:1208396508941127701> Ivirius™ Community!",
+        description=(
+            "### Fluent design, brought to you everywhere.\n"
+            "Grow together, develop for the people.\n\n"
+            "**Useful Links:**\n"
+            "[Website](https://ivirius.com/)  |  "
+            "[Rebound](https://ivirius.com/rebound/)  |  "
+            "[Ivirius Text Editor](https://ivirius.com/ivirius-text-editor/)  |  "
+            "[Ivirius Text Editor Plus](https://ivirius.com/ivirius-text-editor-plus/)\n\n"
+            "<:ZippyWhen:1400922840727031888>"
+        ),
         color=discord.Color.brand_red(),
+        timestamp=discord.utils.utcnow()
     )
-    await member.send(embed=embed)
+    try:
+        await member.send(embed=embed)
+    except Exception as e:
+        print(f"[Warning] Failed to send welcome DM to {member}: {e}")
 
 
 @bot.event
@@ -79,31 +91,26 @@ async def on_member_remove(member):
     if member.guild.id != 1137161703000375336:
         return
 
-    user = member.name
-    nickname = member.nick
-    join_date = member.joined_at
-    total_time = datetime.datetime.now() - join_date
-
-    join_date_formatted = join_date.strftime("%Y-%m-%d %H:%M:%S")
-    total_time_formatted = str(total_time)
+    join_date = member.joined_at or "Unknown"
+    total_time = datetime.datetime.now(datetime.timezone.utc) - join_date if join_date != "Unknown" else "Unknown"
 
     embed = discord.Embed(
         title="Goodbye!",
-        description=f"**{user}** ({nickname}) has left the server.",
+        description=f"**{member.name}** ({member.nick or 'No Nickname'}) has left the server.",
         color=discord.Color.red(),
+        timestamp=discord.utils.utcnow()
     )
 
-    embed.add_field(name="Join Date", value=join_date_formatted, inline=False)
-    embed.add_field(
-        name="Total Time in Server", value=total_time_formatted, inline=False
-    )
-
-    roles = [role.mention for role in member.roles]
-    embed.add_field(name="Roles", value=", ".join(roles), inline=False)
+    embed.add_field(name="Join Date", value=join_date.strftime("%Y-%m-%d %H:%M:%S") if join_date != "Unknown" else "Unknown", inline=False)
+    embed.add_field(name="Total Time in Server", value=str(total_time) if total_time != "Unknown" else "Unknown", inline=False)
+    roles = [role.mention for role in member.roles if role.name != "@everyone"]
+    embed.add_field(name="Roles", value=", ".join(roles) if roles else "None", inline=False)
 
     channel = bot.get_channel(1386050116238049280)
-    await channel.send(embed=embed)
-
+    if channel:
+        await channel.send(embed=embed)
+    else:
+        print("[Warning] Goodbye channel not found.")
 
 @bot.event
 async def on_member_ban(guild, user):
@@ -111,36 +118,58 @@ async def on_member_ban(guild, user):
     banned_by = None
 
     async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=1):
-        if entry.target == user:
-            ban_reason = entry.reason
+        if entry.target.id == user.id:
+            ban_reason = entry.reason or "No reason provided"
             banned_by = entry.user
             break
 
+    # Public announcement
     response = (
         f"{user.mention} has been **banned**!\n"
-        f"Banned by: {banned_by.mention}\n"
+        f"Banned by: {banned_by.mention if banned_by else 'Unknown'}\n"
         f"Reason: {ban_reason}"
     )
-    target_channel = bot.get_channel(1188420266234228809)
-    await target_channel.send(response)
-
+    channel = bot.get_channel(1386050116238049280)
+    if channel:
+        await channel.send(response)
+    else:
+        print("[Warning] Ban announcement channel not found.")
 
 @bot.event
-async def on_member_unban(guild, user):
+async def on_member_unban(guild: discord.Guild, user: discord.User):
     unbanned_by = None
 
-    async for entry in guild.audit_logs(action=discord.AuditLogAction.unban, limit=1):
-        if entry.target == user:
-            unbanned_by = entry.user
-            break
+    try:
+        async for entry in guild.audit_logs(action=discord.AuditLogAction.unban, limit=5):
+            if entry.target.id == user.id:
+                unbanned_by = entry.user
+                break
+    except Exception as e:
+        print(f"[Warning] Failed to fetch audit logs: {e}")
 
-    response = (
-        f"{user.mention} had their ban **revoked**!\n"
-        f"Revoked by: {unbanned_by.mention}\n"
+    channel = bot.get_channel(1386050116238049280)
+    if not channel:
+        print(f"[Warning] Unban announcement channel not found in guild {guild.name} ({guild.id})")
+        return
+
+    description = f"{user.mention} had their ban **revoked**!"
+    if unbanned_by:
+        description += f"\nRevoked by: {unbanned_by.mention}"
+    else:
+        description += "\nRevoked by: Unknown"
+
+    embed = discord.Embed(
+        title="Ban Revoked",
+        description=description,
+        color=discord.Color.green(),
+        timestamp=discord.utils.utcnow()
     )
+    embed.set_footer(text=f"User ID: {user.id}")
 
-    target_channel = bot.get_channel(1188420266234228809)
-    await target_channel.send(response)
+    try:
+        await channel.send(embed=embed)
+    except Exception as e:
+        print(f"[Error] Failed to send unban announcement: {e}")
 
 
 @bot.event
@@ -149,18 +178,21 @@ async def on_member_kick(guild, user):
     kicked_by = None
 
     async for entry in guild.audit_logs(action=discord.AuditLogAction.kick, limit=1):
-        if entry.target == user:
-            kick_reason = entry.reason
+        if entry.target.id == user.id:
+            kick_reason = entry.reason or "No reason provided"
             kicked_by = entry.user
             break
 
     response = (
         f"{user.mention} has been **kicked**!\n"
-        f"Kicked by: {kicked_by.mention}\n"
+        f"Kicked by: {kicked_by.mention if kicked_by else 'Unknown'}\n"
         f"Reason: {kick_reason}"
     )
-    target_channel = bot.get_channel(1188420266234228809)
-    await target_channel.send(response)
+    channel = bot.get_channel(1386050116238049280)
+    if channel:
+        await channel.send(response)
+    else:
+        print("[Warning] Kick announcement channel not found.")
 
 
 @bot.event
@@ -168,22 +200,25 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
     elif isinstance(error, commands.MissingPermissions):
-        await ctx.send("You don't have the required permissions to run this command!")
+        await ctx.send("❌ You don't have the required permissions to run this command!")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("You are missing a required argument!")
+        await ctx.send("⚠️ You are missing a required argument!")
     elif isinstance(error, commands.BadArgument):
-        await ctx.send("You have provided a bad argument!")
+        await ctx.send("⚠️ You have provided a bad argument!")
     elif isinstance(error, commands.CommandOnCooldown):
         await ctx.send(
-            f"This command is on cooldown! Please try again in {error.retry_after:.2f} seconds."
+            f"⏳ This command is on cooldown! Please try again in {error.retry_after:.2f} seconds."
         )
     elif isinstance(error, commands.NotOwner):
-        await ctx.send("You are not the owner of this bot!")
+        await ctx.send("⛔ You are not the owner of this bot!")
     elif isinstance(error, commands.MissingRole):
-        await ctx.send("You are missing a required role!")
+        await ctx.send("❌ You are missing a required role!")
     elif isinstance(error, commands.BotMissingPermissions):
-        await ctx.send("I don't have the required permissions to run this command!")
-
+        await ctx.send("❌ I don't have the required permissions to run this command!")
+    else:
+        # Unexpected error, log for debugging
+        print(f"[Error] {ctx.command} raised an error: {error}")
+        await ctx.send("⚠️ An unexpected error occurred. Please try again later.")
 
 @bot.command()
 @commands.is_owner()
@@ -215,50 +250,44 @@ async def before_invoke(ctx):
 @bot.command()
 async def ping(ctx):
     try:
-        embed = discord.Embed(title="Pong!", color=discord.Color.brand_red())
+        embed = discord.Embed(
+            title="Pong! 🏓",
+            color=discord.Color.brand_red(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+        )
         message = await ctx.send(embed=embed)
 
         end = time.perf_counter()
         latency = (end - ctx.start) * 1000
 
-        embed.add_field(
-            name="Bot Latency", value=f"{bot.latency * 1000:.2f} ms", inline=False
-        )
+        embed.add_field(name="Bot Latency", value=f"{bot.latency * 1000:.2f} ms", inline=False)
         embed.add_field(name="Message Latency", value=f"{latency:.2f} ms", inline=False)
 
-        # Calculate the average ping of the bot in the last 10 minutes
         if latencies:
             average_ping = statistics.mean(latencies)
-            embed.add_field(
-                name="Average Message Latency",
-                value=f"{average_ping:.2f} ms",
-                inline=False,
-            )
+            embed.add_field(name="Average Message Latency", value=f"{average_ping:.2f} ms", inline=False)
 
-        global start_time
+        # Calculate uptime
         current_time = datetime.datetime.now(datetime.timezone.utc)
         delta = current_time - start_time
-
         hours, remainder = divmod(int(delta.total_seconds()), 3600)
         minutes, seconds = divmod(remainder, 60)
 
         embed.add_field(
             name="Uptime",
-            value=f"{hours} hours {minutes} minutes {seconds} seconds",
+            value=f"{hours}h {minutes}m {seconds}s",
             inline=False,
         )
+
         embed.set_footer(
-            text="Information requested by: {}".format(ctx.author.name),
-            icon_url=ctx.author.avatar.url,
-        )
-        embed.set_thumbnail(
-            url="https://uploads.poxipage.com/7q5iw7dwl5jc3zdjaergjhpat27tws8bkr9fgy45_938843265627717703-webp"
+            text=f"Requested by: {ctx.author.display_name}",
+            icon_url=ctx.author.display_avatar.url,
         )
 
         await message.edit(embed=embed)
 
     except Exception as e:
-        print(e, file=sys.stdout)
+        print(f"Ping command error: {e}", file=sys.stdout)
 
 
 if __name__ == "__main__":
