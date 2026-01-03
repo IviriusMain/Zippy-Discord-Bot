@@ -43,7 +43,6 @@ class zippyBot(commands.Bot):
         print(f"Logged in as {self.user.name} (ID: {self.user.id})")
         print(f"Connected to {len(self.guilds)} guilds")
 
-
 bot = zippyBot()
 
 

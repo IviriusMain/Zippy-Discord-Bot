@@ -9,6 +9,95 @@ import datetime
 import re
 from datetime import timedelta
 
+TESTER_ROLE_ID = 1228628053807202364
+IVIRIUS_TEAM_ROLE_ID = 1137503779487486004
+
+class TesterApplicationModal(discord.ui.Modal, title="Tester Application"):
+    country = discord.ui.TextInput(
+        label="What is your country of residence?",
+        required=True,
+        max_length=100
+    )
+
+    age = discord.ui.TextInput(
+        label="Are you at least 13 years of age?",
+        required=True,
+        placeholder="Yes / No",
+        max_length=5
+    )
+
+    nda = discord.ui.TextInput(
+        label="Do you understand leaking = permanent ban?",
+        style=discord.TextStyle.paragraph,
+        required=True
+    )
+
+    def __init__(self, applicant: discord.Member):
+        super().__init__()
+        self.applicant = applicant
+
+    async def on_submit(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🧪 Tester Application",
+            color=discord.Color.blurple()
+        )
+        embed.add_field(name="Applicant", value=self.applicant.mention, inline=False)
+        embed.add_field(name="Country", value=self.country.value, inline=True)
+        embed.add_field(name="13+ Years Old", value=self.age.value, inline=True)
+        embed.add_field(
+            name="Acknowledged NDA",
+            value=self.nda.value,
+            inline=False
+        )
+
+        view = ApplicationReviewView(self.applicant)
+
+        await interaction.response.send_message(
+            embed=embed,
+            view=view
+        )
+
+class ApplicationReviewView(discord.ui.View):
+    def __init__(self, applicant: discord.Member):
+        super().__init__(timeout=None)
+        self.applicant = applicant
+
+    def has_permission(self, interaction: discord.Interaction) -> bool:
+        role = interaction.guild.get_role(IVIRIUS_TEAM_ROLE_ID)
+        return role in interaction.user.roles or interaction.user.guild_permissions.administrator
+
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success)
+    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.has_permission(interaction):
+            await interaction.response.send_message(
+                "❌ You are not authorized to approve applications.",
+                ephemeral=True
+            )
+            return
+
+        role = interaction.guild.get_role(TESTER_ROLE_ID)
+        if role:
+            await self.applicant.add_roles(role, reason="Tester application approved")
+
+        await interaction.response.edit_message(
+            content=f"✅ Approved by {interaction.user.mention}",
+            view=None
+        )
+
+    @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger)
+    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.has_permission(interaction):
+            await interaction.response.send_message(
+                "❌ You are not authorized to deny applications.",
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.edit_message(
+            content=f"❌ Denied by {interaction.user.mention}",
+            view=None
+        )
+
 def parse_timespan(timespan: str) -> int | None:
     """Parse a timespan string like '1d2h30m45s' into total minutes."""
     pattern = r"(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?"
@@ -202,6 +291,11 @@ class moderation(commands.Cog):
         app_commands.Choice(name="Troll", value="Troll"),
         app_commands.Choice(name="Raid", value="Raid"),
     ]
+
+    @app_commands.command(name="apply-tester", description="Apply for tester access")
+    async def apply_tester(self, interaction: discord.Interaction):
+        modal = TesterApplicationModal(interaction.user)
+        await interaction.response.send_modal(modal)
 
     @app_commands.command(name="quickban", description="Quickly ban a user with a preset reason")
     @app_commands.guild_only()
