@@ -41,29 +41,32 @@ namespace Ivirius.Zippy
 
             _client.MessageReceived += async msg =>
             {
-                if (msg.Author.IsBot && msg.Author.Id != _client.CurrentUser.Id) return;
-                if (msg is not IUserMessage userMsg) return;
-                if (msg.Channel is not IGuildChannel guildChannel) return;
-
-                _autoMessenger.OnMessageReceived(msg, _client.CurrentUser.Id);
-
-                // Only respond to pings
-                if (!msg.MentionedUserIds.Contains(_client.CurrentUser.Id)) return;
-                if (msg.Author.Id == _client.CurrentUser.Id) return;
-
-                var guild = (guildChannel as IGuildChannel)!.Guild;
-
-                using (msg.Channel.EnterTypingState())
+                Task.Run(async () => 
                 {
-                    try
+                    if (msg.Author.IsBot && msg.Author.Id != _client.CurrentUser.Id) return;
+                    if (msg is not IUserMessage userMsg) return;
+                    if (msg.Channel is not IGuildChannel guildChannel) return;
+
+                    _autoMessenger.OnMessageReceived(msg, _client.CurrentUser.Id);
+
+                    // Only respond to pings
+                    if (!msg.MentionedUserIds.Contains(_client.CurrentUser.Id)) return;
+                    if (msg.Author.Id == _client.CurrentUser.Id) return;
+
+                    var guild = (guildChannel as IGuildChannel)!.Guild;
+
+                    using (msg.Channel.EnterTypingState())
                     {
-                        await _aiEngine.RespondAsync(msg, guild);
+                        try
+                        {
+                            await _aiEngine.RespondAsync(msg, guild);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[AiEngine] Error: {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[AiEngine] Error: {ex.Message}");
-                    }
-                }
+                });
             };
 
             EnvLoader.Load();
@@ -82,8 +85,11 @@ namespace Ivirius.Zippy
 
         private static async Task OnInteraction(SocketInteraction interaction)
         {
-            var ctx = new SocketInteractionContext(_client, interaction);
-            await _interactions.ExecuteCommandAsync(ctx, null);
+            Task.Run(async () => 
+            {
+                var ctx = new SocketInteractionContext(_client, interaction);
+                await _interactions.ExecuteCommandAsync(ctx, null);
+            });
         }
     }
 }
