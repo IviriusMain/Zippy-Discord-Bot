@@ -57,7 +57,7 @@ namespace Ivirius.Zippy
                 {
                     try
                     {
-                        await _aiEngine.RespondAsync(msg, guild);
+                        _ = Task.Run(async () => await _aiEngine.RespondAsync(msg, guild));
                     }
                     catch (Exception ex)
                     {
@@ -68,6 +68,7 @@ namespace Ivirius.Zippy
 
             EnvLoader.Load();
             var token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
+
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
             await Task.Delay(-1);
@@ -81,34 +82,8 @@ namespace Ivirius.Zippy
 
         private static async Task OnInteraction(SocketInteraction interaction)
         {
-            ulong.TryParse(Environment.GetEnvironmentVariable("FALLBACK_LOG_CHANNEL_ID"), out ulong fallbackLogChannelId);
-
             var ctx = new SocketInteractionContext(_client, interaction);
-            var result = await _interactions.ExecuteCommandAsync(ctx, null);
-
-            Console.WriteLine(result.Error?.ToString() + " --- " + result.ErrorReason);
-
-            if (!result.IsSuccess)
-            {
-                var guildChannel = interaction.Channel as IGuildChannel;
-                if (guildChannel != null)
-                {
-                    var config = AiConfigStorage.Get(guildChannel.Guild.Id);
-                    var logChannelId = config.LogChannelId != 0 ? config.LogChannelId : fallbackLogChannelId;
-                    if (logChannelId != null && logChannelId != 0 &&
-                        await _client.GetChannelAsync(logChannelId ?? 0) is ITextChannel logChannel)
-                    {
-                        var embed = new EmbedBuilder()
-                            .WithTitle("Interaction Error")
-                            .WithColor(Color.Red)
-                            .AddField("Error", result.Error?.ToString() ?? "Unknown")
-                            .AddField("Reason", result.ErrorReason ?? "None")
-                            .WithCurrentTimestamp()
-                            .Build();
-                        await logChannel.SendMessageAsync(embed: embed);
-                    }
-                }
-            }
+            await _interactions.ExecuteCommandAsync(ctx, null);
         }
     }
 }
