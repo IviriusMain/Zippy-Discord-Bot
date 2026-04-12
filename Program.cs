@@ -86,6 +86,8 @@ namespace Ivirius.Zippy
             var ctx = new SocketInteractionContext(_client, interaction);
             var result = await _interactions.ExecuteCommandAsync(ctx, null);
 
+            Console.WriteLine(result.Error?.ToString() + " --- " + result.ErrorReason);
+
             if (!result.IsSuccess)
             {
                 var guildChannel = interaction.Channel as IGuildChannel;
