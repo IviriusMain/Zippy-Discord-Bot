@@ -83,7 +83,28 @@ namespace Ivirius.Zippy
         private static async Task OnInteraction(SocketInteraction interaction)
         {
             var ctx = new SocketInteractionContext(_client, interaction);
-            await _interactions.ExecuteCommandAsync(ctx, null);
+            var result = await _interactions.ExecuteCommandAsync(ctx, null);
+
+            if (!result.IsSuccess)
+            {
+                var guildChannel = interaction.Channel as IGuildChannel;
+                if (guildChannel != null)
+                {
+                    var config = AiConfigStorage.Get(guildChannel.Guild.Id);
+                    if (config.LogChannelId != null && config.LogChannelId != 0 &&
+                        await _client.GetChannelAsync(config.LogChannelId ?? 0) is ITextChannel logChannel)
+                    {
+                        var embed = new EmbedBuilder()
+                            .WithTitle("Interaction Error")
+                            .WithColor(Color.Red)
+                            .AddField("Error", result.Error?.ToString() ?? "Unknown")
+                            .AddField("Reason", result.ErrorReason ?? "None")
+                            .WithCurrentTimestamp()
+                            .Build();
+                        await logChannel.SendMessageAsync(embed: embed);
+                    }
+                }
+            }
         }
     }
 }
