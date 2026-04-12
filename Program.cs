@@ -57,7 +57,7 @@ namespace Ivirius.Zippy
                 {
                     try
                     {
-                        _ = Task.Run(async () => await _aiEngine.RespondAsync(msg, guild));
+                        await _aiEngine.RespondAsync(msg, guild);
                     }
                     catch (Exception ex)
                     {
