@@ -68,7 +68,6 @@ namespace Ivirius.Zippy
 
             EnvLoader.Load();
             var token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
-
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
             await Task.Delay(-1);
@@ -82,6 +81,8 @@ namespace Ivirius.Zippy
 
         private static async Task OnInteraction(SocketInteraction interaction)
         {
+            ulong.TryParse(Environment.GetEnvironmentVariable("FALLBACK_LOG_CHANNEL_ID"), out ulong fallbackLogChannelId);
+
             var ctx = new SocketInteractionContext(_client, interaction);
             var result = await _interactions.ExecuteCommandAsync(ctx, null);
 
@@ -91,8 +92,9 @@ namespace Ivirius.Zippy
                 if (guildChannel != null)
                 {
                     var config = AiConfigStorage.Get(guildChannel.Guild.Id);
-                    if (config.LogChannelId != null && config.LogChannelId != 0 &&
-                        await _client.GetChannelAsync(config.LogChannelId ?? 0) is ITextChannel logChannel)
+                    var logChannelId = config.LogChannelId != 0 ? config.LogChannelId : fallbackLogChannelId;
+                    if (logChannelId != null && logChannelId != 0 &&
+                        await _client.GetChannelAsync(logChannelId ?? 0) is ITextChannel logChannel)
                     {
                         var embed = new EmbedBuilder()
                             .WithTitle("Interaction Error")
