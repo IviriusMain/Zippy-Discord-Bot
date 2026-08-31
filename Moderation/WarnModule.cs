@@ -1,331 +1,302 @@
 using Discord;
 using Discord.Interactions;
-using Discord.WebSocket;
-using System.Diagnostics;
 using System.Text.Json;
 
-namespace Ivirius.Zippy.Moderation
+namespace Ivirius.Zippy.Moderation;
+
+/// <summary>
+/// Handles and keeps track of warns for a specific user.
+/// </summary>
+public class WarnModule : InteractionModuleBase<SocketInteractionContext>
 {
-    // Warn model
-    public class WarnEntry
+    // Command declarations
+
+    [SlashCommand("warn", "Warn a user")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    public async Task WarnAsync([Summary("user")] IUser user, [Summary("reason")] string reason)
+        => await ExecuteWarnAsync(user.Id.ToString(), reason);
+
+    [SlashCommand("warn-bulk", "Warn one or more users by ID")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    public async Task WarnBulkAsync(
+        [Summary("user_ids", "Comma-separated list of user IDs (<ID>, <ID>, <ID>)")] string userIds,
+        [Summary("reason")] string reason)
+        => await ExecuteWarnAsync(userIds, reason);
+
+    [SlashCommand("remove-warn", "Remove a specific warn from a user")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    public async Task RemoveWarnAsync(
+        [Summary("user")] IUser user,
+        [Summary("warn_id", "The GUID of the warn to remove")] string warnId)
+        => await ExecuteRemoveWarnAsync(user, warnId);
+
+    [SlashCommand("warns", "View all warns for a user")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    public async Task WarnsAsync([Summary("user")] IUser user)
+        => await ExecuteGetWarnsAsync(user);
+
+    [SlashCommand("clear-warns", "Clear all warns from a user")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    public async Task ClearWarnsAsync([Summary("user", "The user to clear warns from")] IUser user)
+        => await ExecuteClearWarnsAsync(user);
+
+    public async Task ExecuteWarnAsync(string userIds, string reason)
     {
-        public string Id { get; set; } = Guid.NewGuid().ToString();
-        public string Reason { get; set; } = string.Empty;
-        public ulong ModeratorId { get; set; }
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    }
+        await DeferAsync();
 
-    // JSON storage helper
-    public static class WarnStorage
-    {
-        private static readonly string Path = System.IO.Path.Combine(AppContext.BaseDirectory, "data", "warns.json");
-        private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+        var ids = userIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(id => ulong.TryParse(id, out var uid) ? uid : 0)
+            .Where(id => id != 0)
+            .ToList();
 
-        private static Dictionary<string, Dictionary<string, List<WarnEntry>>> Load()
+        if (ids.Count == 0)
         {
-            if (!File.Exists(Path))
-                return [];
-
-            var json = File.ReadAllText(Path);
-            return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, List<WarnEntry>>>>(json) ?? [];
-        }
-
-        private static void Save(Dictionary<string, Dictionary<string, List<WarnEntry>>> data)
-        {
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-            File.WriteAllText(Path, JsonSerializer.Serialize(data, Options));
-        }
-
-        public static List<WarnEntry> GetWarns(ulong guildId, ulong userId)
-        {
-            var data = Load();
-            var gKey = guildId.ToString();
-            var uKey = userId.ToString();
-            return data.TryGetValue(gKey, out var guild) && guild.TryGetValue(uKey, out var warns) ? warns : [];
-        }
-
-        public static WarnEntry AddWarn(ulong guildId, ulong userId, ulong moderatorId, string reason)
-        {
-            var data = Load();
-            var gKey = guildId.ToString();
-            var uKey = userId.ToString();
-
-            if (!data.ContainsKey(gKey)) data[gKey] = [];
-            if (!data[gKey].ContainsKey(uKey)) data[gKey][uKey] = [];
-
-            var entry = new WarnEntry { Reason = reason, ModeratorId = moderatorId };
-            data[gKey][uKey].Add(entry);
-            Save(data);
-            return entry;
-        }
-
-        public static bool RemoveWarn(ulong guildId, ulong userId, string warnId)
-        {
-            var data = Load();
-            var gKey = guildId.ToString();
-            var uKey = userId.ToString();
-
-            if (!data.TryGetValue(gKey, out var guild) || !guild.TryGetValue(uKey, out var warns))
-                return false;
-
-            var entry = warns.FirstOrDefault(w => w.Id == warnId);
-            if (entry is null) return false;
-
-            warns.Remove(entry);
-            Save(data);
-            return true;
-        }
-
-        public static int ClearWarns(ulong guildId, ulong userId)
-        {
-            var data = Load();
-            var gKey = guildId.ToString();
-            var uKey = userId.ToString();
-
-            if (!data.TryGetValue(gKey, out var guild) || !guild.TryGetValue(uKey, out var warns))
-                return 0;
-
-            int count = warns.Count;
-            warns.Clear();
-            Save(data);
-            return count;
-        }
-    }
-
-    public class WarnModule : InteractionModuleBase<SocketInteractionContext>
-    {
-        /// <summary>
-        /// Warn a user.
-        /// </summary>
-        [SlashCommand("warn", "Warn a user")]
-        [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
-        public async Task WarnAsync(
-            [Summary("user_id", "The user to warn")] string userId,
-            [Summary("reason", "The reason for the warn")] string reason,
-            [Summary("silent_warn", "Warn without notifying the user via DM. Default: false.")] bool silent = false)
-        {
-            await ExecuteWarnAsync(userId, reason, silent, false);
-        }
-
-        /// <summary>
-        /// Remove a specific warn from a user.
-        /// </summary>
-        [SlashCommand("removewarn", "Remove a specific warn from a user")]
-        [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
-        public async Task RemoveWarnAsync(
-            [Summary("user_id", "The user to remove the warn from")] string userId,
-            [Summary("warn_id", "The ID of the warn to remove")] string warnId)
-        {
-            await ExecuteRemoveWarnAsync(userId, warnId, false);
-        }
-
-        /// <summary>
-        /// Clear all warns from a user.
-        /// </summary>
-        [SlashCommand("clearwarns", "Clear all warns from a user")]
-        [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
-        public async Task ClearWarnsAsync(
-            [Summary("user_id", "The user to clear warns from")] string userId)
-        {
-            await ExecuteClearWarnsAsync(userId, false);
-        }
-
-        /// <summary>
-        /// View all warns for a user.
-        /// </summary>
-        [SlashCommand("warns", "View all warns for a user")]
-        [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
-        public async Task WarnsAsync(
-            [Summary("user_id", "The user to view warns for")] string userId)
-        {
-            await ExecuteGetWarnsAsync(userId, false);
-        }
-
-        public async Task<string> ExecuteWarnAsync(string userId, string reason, bool silent, bool aiTriggered, DiscordSocketClient? client = null, IGuild? guild = null, IUser? userP = null)
-        {
-            var resolvedGuild = aiTriggered ? guild! : Context.Guild;
-            var resolvedClient = aiTriggered ? client! : Context.Client;
-            var resolvedUser = aiTriggered ? userP! : Context.User;
-
-            if (!aiTriggered)
-                await DeferAsync(ephemeral: silent);
-
-            if (!ulong.TryParse(userId, out var uid))
-            {
-                if (!aiTriggered)
-                {
-                    await FollowupAsync(embed: ErrorEmbed("❌ Invalid user ID."), ephemeral: true);
-                    return string.Empty;
-                }
-                Debug.WriteLine("Couldn't warn - invalid user ID.");
-                return "Couldn't warn - invalid user ID.";
-            }
-
-            var entry = WarnStorage.AddWarn(resolvedGuild.Id, uid, resolvedUser.Id, reason);
-
-            if (!silent)
-            {
-                try
-                {
-                    var user = await resolvedClient.GetUserAsync(uid);
-                    if (user is not null)
-                    {
-                        var dmEmbed = new EmbedBuilder()
-                            .WithTitle($"You have been warned in **{resolvedGuild.Name}**.")
-                            .WithDescription($"**Reason:** {reason}\n**Warn ID:** `{entry.Id}`")
-                            .WithColor(Color.Parse("#66dea0"))
-                            .Build();
-
-                        var dm = await user.CreateDMChannelAsync();
-                        await dm.SendMessageAsync(embed: dmEmbed);
-                    }
-                }
-                catch
-                {
-                    // DMs closed — continue
-                }
-            }
-
-            if (aiTriggered)
-            {
-                Debug.WriteLine($"Warned <@{uid}>. Warn ID: {entry.Id}");
-                return $"Warned <@{uid}>. Warn ID: {entry.Id}";
-            }
-
-            var warns = WarnStorage.GetWarns(resolvedGuild.Id, uid);
-            var embed = new EmbedBuilder()
-                .WithTitle("User Warned")
-                .WithColor(Color.Parse("#66dea0"))
-                .WithDescription($"⚠️ <@{uid}> has been **warned**.")
-                .AddField("Reason", reason, inline: false)
-                .AddField("Warn ID", $"`{entry.Id}`", inline: false)
-                .AddField("Total Warns", warns.Count.ToString(), inline: false)
-                .WithFooter($"Requested by {resolvedUser.Username}", resolvedUser.GetAvatarUrl())
-                .WithCurrentTimestamp()
+            var errorEmbed = new EmbedBuilder()
+                .WithTitle("No valid user IDs were provided.")
+                .WithColor(Color.Parse("#d13a08"))
                 .Build();
 
-            await FollowupAsync(embed: embed, ephemeral: silent);
-            return $"Warned <@{uid}>. Warn ID: {entry.Id}";
+            await FollowupAsync(embed: errorEmbed, ephemeral: true);
         }
 
-        public async Task<string> ExecuteRemoveWarnAsync(string userId, string warnId, bool aiTriggered)
+        var successLines = new List<string>();
+        var successPings = new List<string>();
+        var failureLines = new List<string>();
+
+        foreach (var userId in ids)
         {
-            if (!aiTriggered)
-                await DeferAsync(ephemeral: true);
-
-            if (!ulong.TryParse(userId, out var uid))
+            try
             {
-                if (!aiTriggered)
-                {
-                    await FollowupAsync(embed: ErrorEmbed("❌ Invalid user ID."), ephemeral: true);
-                    return string.Empty;
-                }
-                return "Couldn't remove warn - invalid user ID.";
+                var guildUser = await Context.Client.Rest.GetGuildUserAsync(Context.Guild.Id, userId);
+                if (guildUser is null)
+                    throw new Exception("User not found in this server.");
+
+                // Apply timeout
+                WarnStorage.AddWarn(Context.Guild.Id, userId, Context.User.Id, reason);
+
+                successLines.Add($"`[ PASS ]` <@{userId}> (`{userId}`)");
+                successPings.Add($"<@{userId}>");
             }
-
-            bool removed = WarnStorage.RemoveWarn(Context.Guild.Id, uid, warnId);
-
-            if (!removed)
+            catch (Exception ex)
             {
-                if (!aiTriggered)
-                {
-                    await FollowupAsync(embed: ErrorEmbed("❌ Warn not found."), ephemeral: true);
-                    return string.Empty;
-                }
-                return "Couldn't remove warn - warn ID not found.";
+                var errorMsg =
+                ex.Message.Contains("error 50013") ? "Missing permissions." :
+                ex.Message;
+
+                failureLines.Add($"`[ FAIL ]` <@{userId}> (`{userId}`) - {errorMsg}");
             }
-
-            if (aiTriggered)
-                return $"Removed warn `{warnId}` from <@{uid}>.";
-
-            var embed = new EmbedBuilder()
-                .WithTitle("Warn Removed")
-                .WithColor(Color.Parse("#66dea0"))
-                .WithDescription($"✅ Warn `{warnId}` has been removed from <@{uid}>.")
-                .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
-                .WithCurrentTimestamp()
-                .Build();
-
-            await FollowupAsync(embed: embed, ephemeral: true);
-            return $"Removed warn `{warnId}` from <@{uid}>.";
         }
 
-        public async Task<string> ExecuteClearWarnsAsync(string userId, bool aiTriggered)
-        {
-            if (!aiTriggered)
-                await DeferAsync(ephemeral: true);
+        bool allFailed = successLines.Count == 0;
+        bool partialFail = failureLines.Count > 0 && successLines.Count > 0;
 
-            if (!ulong.TryParse(userId, out var uid))
-            {
-                if (!aiTriggered)
-                {
-                    await FollowupAsync(embed: ErrorEmbed("❌ Invalid user ID."), ephemeral: true);
-                    return string.Empty;
-                }
-                return "Couldn't clear warns - invalid user ID.";
-            }
+        var title = allFailed ? "Warn Failed"
+            : partialFail ? "Warn Partially Failed"
+            : "Warn Successful";
 
-            int count = WarnStorage.ClearWarns(Context.Guild.Id, uid);
+        var color = allFailed ? Color.Parse("#d13a08")
+            : partialFail ? Color.Parse("#e0a021")
+            : Color.Parse("#66dea0");
 
-            if (aiTriggered)
-                return $"Cleared {count} warn{(count != 1 ? "s" : "")} from <@{uid}>.";
-
-            var embed = new EmbedBuilder()
-                .WithTitle("Warns Cleared")
-                .WithColor(Color.Parse("#66dea0"))
-                .WithDescription($"🗑️ Cleared **{count}** warn{(count != 1 ? "s" : "")} from <@{uid}>.")
-                .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
-                .WithCurrentTimestamp()
-                .Build();
-
-            await FollowupAsync(embed: embed, ephemeral: true);
-            return $"Cleared {count} warn(s) from <@{uid}>.";
-        }
-
-        public async Task<string> ExecuteGetWarnsAsync(string userId, bool aiTriggered)
-        {
-            if (!aiTriggered)
-                await DeferAsync(ephemeral: true);
-
-            if (!ulong.TryParse(userId, out var uid))
-            {
-                if (!aiTriggered)
-                {
-                    await FollowupAsync(embed: ErrorEmbed("❌ Invalid user ID."), ephemeral: true);
-                    return string.Empty;
-                }
-                return "Couldn't get warns - invalid user ID.";
-            }
-
-            var warns = WarnStorage.GetWarns(Context.Guild.Id, uid);
-
-            if (aiTriggered)
-            {
-                if (warns.Count == 0)
-                    return $"<@{uid}> has no warns.";
-                return string.Join("\n", warns.Select(w => $"- `{w.Id}` | {w.Reason} | <@{w.ModeratorId}> | {w.Timestamp:yyyy-MM-dd HH:mm} UTC"));
-            }
-
-            var description = warns.Count == 0
-                ? $"<@{uid}> has no warns."
-                : string.Join("\n", warns.Select(w => $"`{w.Id}`\n**Reason:** {w.Reason}\n**By:** <@{w.ModeratorId}> • {w.Timestamp:yyyy-MM-dd HH:mm} UTC\n"));
-
-            var embed = new EmbedBuilder()
-                .WithTitle($"Warns for {uid}")
-                .WithColor(Color.Parse("#66dea0"))
-                .WithDescription(description)
-                .AddField("Total", warns.Count.ToString(), inline: false)
-                .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
-                .WithCurrentTimestamp()
-                .Build();
-
-            await FollowupAsync(embed: embed, ephemeral: true);
-            return description;
-        }
-
-        private static Embed ErrorEmbed(string message) => new EmbedBuilder()
-            .WithTitle(message)
-            .WithColor(Color.Parse("#d1533d"))
+        var embed = new EmbedBuilder()
+            .WithTitle(title)
+            .WithColor(color)
+            .AddField("Status", string.Join("\n", successLines.Concat(failureLines)), inline: false)
+            .AddField("Reason", reason, inline: true)
+            .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
+            .WithCurrentTimestamp()
             .Build();
+
+        var message = string.Join(", ", successPings) + ", you have been warned!";
+
+        await FollowupAsync(embed: embed, text: message);
+    }
+
+    public async Task ExecuteRemoveWarnAsync(IUser user, string warnId)
+    {
+        await DeferAsync();
+
+        bool removed = WarnStorage.RemoveWarn(Context.Guild.Id, user.Id, warnId);
+
+        if (!removed)
+        {
+            var errorEmbed = new EmbedBuilder()
+                .WithTitle("Warn not found.")
+                .WithColor(Color.Parse("#d13a08"))
+                .Build();
+
+            await FollowupAsync(embed: errorEmbed, ephemeral: true);
+            return;
+        }
+
+        var embed = new EmbedBuilder()
+            .WithTitle("Warn Removed")
+            .WithColor(Color.Parse("#66dea0"))
+            .WithDescription($"Warn `{warnId}` has been removed from <@{user.Id}>.")
+            .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
+            .WithCurrentTimestamp()
+            .Build();
+
+        await FollowupAsync(embed: embed);
+    }
+
+
+    public async Task ExecuteGetWarnsAsync(IUser user, bool silent = true)
+    {
+        await DeferAsync(ephemeral: silent);
+
+        var warns = WarnStorage.GetWarns(Context.Guild.Id, user.Id);
+
+        if (warns == null || warns.Count == 0)
+        {
+            var emptyEmbed = new EmbedBuilder()
+                .WithTitle($"Warns for {user.Username}")
+                .WithDescription("No warns found for this user.")
+                .WithColor(Color.Parse("#66dea0"))
+                .Build();
+
+            await FollowupAsync(embed: emptyEmbed, ephemeral: silent);
+            return;
+        }
+
+        var chunkedWarns = warns.Chunk(10).Take(10);
+        var embedsToSend = new List<Embed>();
+
+        int page = 1;
+        foreach (var chunk in chunkedWarns)
+        {
+            var embedBuilder = new EmbedBuilder()
+                .WithTitle($"Warns for {user.Username} (Page {page})")
+                .WithColor(Color.Parse("#66dea0"))
+                .WithDescription($"**Total warns:** {warns.Count}")
+                .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
+                .WithCurrentTimestamp();
+
+            foreach (var warn in chunk)
+            {
+                string safeReason = warn.Reason.Length > 900
+                    ? $"{warn.Reason[..900]}..."
+                    : warn.Reason;
+
+                embedBuilder.AddField(
+                    $"`{warn.Id}`",
+                    $"**Moderator:** <@{warn.ModeratorId}>\n**Timestamp:** <t:{((DateTimeOffset)warn.Timestamp).ToUnixTimeSeconds()}:R>\n```\n{safeReason}\n```",
+                    true
+                );
+            }
+
+            embedsToSend.Add(embedBuilder.Build());
+            page++;
+        }
+
+        await FollowupAsync(embeds: embedsToSend.ToArray(), ephemeral: silent);
+    }
+
+    public async Task ExecuteClearWarnsAsync(IUser user)
+    {
+        await DeferAsync();
+
+        int count = WarnStorage.ClearWarns(Context.Guild.Id, user.Id);
+
+        var embed = new EmbedBuilder()
+            .WithTitle("Warns Cleared")
+            .WithColor(Color.Parse("#66dea0"))
+            .WithDescription($"Cleared **{count} warn{(count != 1 ? "s" : "")}** from <@{user.Id}>.")
+            .WithFooter($"Requested by {Context.User.Username}", Context.User.GetAvatarUrl())
+            .WithCurrentTimestamp()
+            .Build();
+
+        await FollowupAsync(embed: embed);
+    }
+}
+
+// Warn model
+public class WarnEntry
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Reason { get; set; } = string.Empty;
+    public ulong ModeratorId { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+}
+
+// JSON storage helper
+public static class WarnStorage
+{
+    private static readonly string DataDirectory = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                                                            "Zippy-Discord-Bot",
+                                                                            "data");
+    private static readonly string Path = System.IO.Path.Combine(DataDirectory, "warns.json");
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+
+    private static Dictionary<string, Dictionary<string, List<WarnEntry>>> Load()
+    {
+        if (!File.Exists(Path))
+            return [];
+
+        var json = File.ReadAllText(Path);
+        return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, List<WarnEntry>>>>(json) ?? [];
+    }
+
+    private static void Save(Dictionary<string, Dictionary<string, List<WarnEntry>>> data)
+    {
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
+        File.WriteAllText(Path, JsonSerializer.Serialize(data, Options));
+    }
+
+    public static List<WarnEntry> GetWarns(ulong guildId, ulong userId)
+    {
+        var data = Load();
+        var gKey = guildId.ToString();
+        var uKey = userId.ToString();
+        return data.TryGetValue(gKey, out var guild) && guild.TryGetValue(uKey, out var warns) ? warns : [];
+    }
+
+    public static WarnEntry AddWarn(ulong guildId, ulong userId, ulong moderatorId, string reason)
+    {
+        var data = Load();
+        var gKey = guildId.ToString();
+        var uKey = userId.ToString();
+
+        if (!data.ContainsKey(gKey)) data[gKey] = [];
+        if (!data[gKey].ContainsKey(uKey)) data[gKey][uKey] = [];
+
+        var entry = new WarnEntry { Reason = reason, ModeratorId = moderatorId };
+        data[gKey][uKey].Add(entry);
+        Save(data);
+        return entry;
+    }
+
+    public static bool RemoveWarn(ulong guildId, ulong userId, string warnId)
+    {
+        var data = Load();
+        var gKey = guildId.ToString();
+        var uKey = userId.ToString();
+
+        if (!data.TryGetValue(gKey, out var guild) || !guild.TryGetValue(uKey, out var warns))
+            return false;
+
+        var entry = warns.FirstOrDefault(w => w.Id == warnId);
+        if (entry is null) return false;
+
+        warns.Remove(entry);
+        Save(data);
+        return true;
+    }
+
+    public static int ClearWarns(ulong guildId, ulong userId)
+    {
+        var data = Load();
+        var gKey = guildId.ToString();
+        var uKey = userId.ToString();
+
+        if (!data.TryGetValue(gKey, out var guild) || !guild.TryGetValue(uKey, out var warns))
+            return 0;
+
+        int count = warns.Count;
+        warns.Clear();
+        Save(data);
+        return count;
     }
 }
