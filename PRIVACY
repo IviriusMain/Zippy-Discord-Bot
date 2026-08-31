@@ -1,0 +1,34 @@
+# Privacy Policy
+
+*Last Updated: August 31, 2026*
+
+### 1. Overview
+
+This Privacy Policy explains how Zippy handles user data. Zippy is designed strictly to assist server administrators and moderators in managing community safety and enforcing server rules.
+
+### 2. Information We Collect
+
+Zippy only stores data directly supplied through moderation commands executed by server staff. This data includes:
+
+- **Identifiers:** Discord User IDs (target user and issuing moderator) and Guild (Server) IDs.
+- **Moderation Log Details:** Reasons for actions, action duration, timestamps, notes, warning logs, and mute history.
+
+We do not log general chat messages, read private messages, track user activity, or store personal offline information.
+
+### 3. Data Storage & Security
+
+All moderation records are stored locally on secure server infrastructure maintained by us. While data is restricted from unauthorized external access, server moderators are responsible for ensuring that the information entered into moderation commands complies with their own server guidelines. Data is never sold, rented, shared with third parties, or used to train Large Language Models (LLMs).
+
+### 4. Data Retention
+
+Moderation records are retained indefinitely to ensure server teams maintain an integral history of member infractions across staff changes. Records remain stored even if Zippy leaves or is removed from a server.
+
+### 5. Data Access & Deletion Requests
+
+- **Moderator Control:** Server staff can remove specific records (warnings, mutes, notes) directly within Discord using built-in deletion commands (e.g., `/remove-warn`, `/remove-detention`).
+- **Individual Requests:** Due to the risk of individuals attempting to erase legitimate server infraction records to evade moderation history, individual user deletion requests are evaluated on a case-by-case basis.
+
+To submit a data access or deletion request, contact us via:
+
+- **Support Form:** https://ivirius.com/support
+- **Email:** [ivirius.helpdesk@gmail.com](mailto:ivirius.helpdesk@gmail.com)

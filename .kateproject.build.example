@@ -1,0 +1,18 @@
+{
+    "Auto_generated": "This file is auto-generated. Any extra tags or formatting will be lost",
+    "target_sets": [
+        {
+            "cmake_config": "",
+            "directory": "<directory-location-here>",
+            "loaded_via_cmake": false,
+            "name": "Zippy Discord Bot",
+            "targets": [
+                {
+                    "build_cmd": "dotnet build Zippy-Discord-Bot.csproj",
+                    "name": "Build",
+                    "run_cmd": "dotnet watch --project Zippy-Discord-Bot.csproj"
+                }
+            ]
+        }
+    ]
+}
